@@ -12,6 +12,7 @@ __pycache__/
 *.pem
 *.json
 service_key.json
+webclient.json
 
 # Node / React (if present)
 node_modules/
@@ -22,3 +23,18 @@ build/
 .vscode/
 .idea/
 .DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets
+.env
+*.env
+*.json
+*.key
+*.pem
+service_key.json
+config.py   # if it contains API keys
+

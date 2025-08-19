@@ -18,3 +18,11 @@ def me(request: Request):
         raise HTTPException(status_code=401, detail="Not authenticated")
     # Optionally fetch user info from Google here or return token info
     return {"token": creds["token"]}
+
+
+@router.get("/files")
+def list_drive_files(request: Request):
+    creds = request.session.get("credentials")
+    if not creds:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return service.list_drive_files(creds)
