@@ -15,6 +15,7 @@ from multi_indexer_02 import GoogleDriveIndexer
 
 # Import our auth/drive routers
 from auth import routes as auth_routes
+from platforms import  plat_route as platform_routes
 #from drive import routes as drive_routes
 
 # ===== OPENAI SETUP =====
@@ -38,6 +39,7 @@ app.add_middleware(
 
 # Register auth + drive routes
 app.include_router(auth_routes.router)
+app.include_router(platform_routes.router)
 #app.include_router(drive_routes.router)
 
 # ===== GLOBAL INDEXER =====
