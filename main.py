@@ -135,7 +135,7 @@ async def query_index(
     file_type: Optional[str] = None
 ):
     try:
-        context = indexer.query(query_text, k=k, source=source, file_type=file_type)
+        context = indexer.query_index(query_text, k=k, source=source, file_type=file_type)
 
         print("<=============================>")
         print("The context is ============> " , context)

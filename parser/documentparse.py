@@ -7,8 +7,9 @@ from docling.document_converter import (
     InputFormat,
     PdfFormatOption,
 )
-import fitz  # PyMuPDF for extracting images from PDF
+import fitz  # PyMuPDF
 from pix2tex.cli import LatexOCR
+
 
 def extract_images_from_pdf(pdf_path):
     """Extract images from each page of a PDF."""
@@ -25,24 +26,19 @@ def extract_images_from_pdf(pdf_path):
             })
     return images
 
-def main():
-    # Source document to convert
-    source = "../Downloads/abctest.pdf"
 
-    # Download RapidOCR models from HuggingFace
+def convert_pdf_to_markdown(pdf_path: str, output_dir: str = "output") -> str:
+    """
+    Converts PDF file at pdf_path to Markdown with embedded mathematical formulas extracted via OCR.
+    Saves the result in output_dir folder, returns path to the generated Markdown file.
+    """
     print("Downloading RapidOCR models")
     download_path = snapshot_download(repo_id="SWHL/RapidOCR")
 
-    # Setup RapidOcrOptions for english detection
-    det_model_path = os.path.join(
-        download_path, "PP-OCRv4", "en_PP-OCRv3_det_infer.onnx"
-    )
-    rec_model_path = os.path.join(
-        download_path, "PP-OCRv4", "ch_PP-OCRv4_rec_server_infer.onnx"
-    )
-    cls_model_path = os.path.join(
-        download_path, "PP-OCRv3", "ch_ppocr_mobile_v2.0_cls_train.onnx"
-    )
+    det_model_path = os.path.join(download_path, "PP-OCRv4", "en_PP-OCRv3_det_infer.onnx")
+    rec_model_path = os.path.join(download_path, "PP-OCRv4", "ch_PP-OCRv4_rec_server_infer.onnx")
+    cls_model_path = os.path.join(download_path, "PP-OCRv3", "ch_ppocr_mobile_v2.0_cls_train.onnx")
+
     ocr_options = RapidOcrOptions(
         det_model_path=det_model_path,
         rec_model_path=rec_model_path,
@@ -53,7 +49,6 @@ def main():
         ocr_options=ocr_options,
     )
 
-    # Convert the document (text & images)
     converter = DocumentConverter(
         format_options={
             InputFormat.PDF: PdfFormatOption(
@@ -62,45 +57,41 @@ def main():
         },
     )
 
-    conversion_result: ConversionResult = converter.convert(source=source)
+    print(f"Converting PDF document: {pdf_path}")
+    conversion_result: ConversionResult = converter.convert(source=pdf_path)
     doc = conversion_result.document
     md = doc.export_to_markdown()
 
-    # Extract images for mathematical formulas
     print("Extracting images from PDF pages for formula detection...")
-    images = extract_images_from_pdf(source)
+    images = extract_images_from_pdf(pdf_path)
     pix2tex_model = LatexOCR()
     math_md_blocks = []
     for img in images:
         try:
             latex_code = pix2tex_model(img["bytes"])
-            # Heuristic: consider result as math if contains a typical math char and length sufficient
-            if latex_code and (any(char in latex_code for char in "=\frac{}\sum\sqrt") and len(latex_code.strip()) > 3):
+            # Heuristic: consider as math if contains math chars and sufficient length
+            if latex_code and (any(c in latex_code for c in "=\\frac{}\\sum\\sqrt") and len(latex_code.strip()) > 3):
                 math_md_blocks.append(
                     f"\n\n**Math Formula from Page {img['page']}**:\n\n$$\n{latex_code}\n$$\n"
                 )
         except Exception as e:
             print(f"[WARN] Math OCR failed on page {img['page']}: {e}")
 
-    # Append math formulas to markdown output
     if math_md_blocks:
         md += "\n".join(math_md_blocks)
 
-    # Create the output filename based on the input filename
-    input_filename = os.path.basename(source)
-    input_filename_without_extension = os.path.splitext(input_filename)[0]
-    output_filename = f"new{input_filename_without_extension}.md"
+    input_filename = os.path.basename(pdf_path)
+    filename_wo_ext = os.path.splitext(input_filename)[0]
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"new{filename_wo_ext}.md")
 
-    # Create the 'output' directory if it doesn't exist
-    output_directory = "output"
-    os.makedirs(output_directory, exist_ok=True)
-    output_path = os.path.join(output_directory, output_filename)
-
-    # Write the Markdown output to the file
-    with open(output_path, 'w', encoding='utf-8') as outfile:
+    with open(output_path, "w", encoding="utf-8") as outfile:
         outfile.write(md)
 
     print(f"Markdown output written to: {output_path}")
+    return output_path
 
-if __name__ == "__main__":
-    main()
+
+# Example usage:
+# output_md = convert_pdf_to_markdown("../Downloads/abctest.pdf")
+# print(f"Markdown file saved at: {output_md}")

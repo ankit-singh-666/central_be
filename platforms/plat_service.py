@@ -9,7 +9,7 @@ import zipfile
 from typing import List
 
 
-def list_drive_files(credentials_dict):
+def list_drive_files(credentials_dict, imageFetch=False):
     # Rebuild Credentials object
     credentials = google.oauth2.credentials.Credentials(
         token=credentials_dict["token"],
@@ -24,10 +24,20 @@ def list_drive_files(credentials_dict):
 
     files = []
     page_token = None
+
+    # Base query: not trashed
+    q = "trashed = false"
+
+    # Exclude images if imageFetch is False
+    if not imageFetch:
+        # Exclude common image mime types, add others as needed
+        exclude_images_query = " and not mimeType contains 'image/'"
+        q += exclude_images_query
+
     try:
         while True:
             response = drive_service.files().list(
-                q="trashed = false",
+                q=q,
                 spaces='drive',
                 fields="nextPageToken, files(id, name, mimeType, parents)",
                 pageToken=page_token
