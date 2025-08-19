@@ -3,7 +3,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from typing import Optional
+from typing import Optional,Union, List
 import shutil
 from pathlib import Path
 import tempfile
@@ -11,7 +11,7 @@ import os
 
 import openai
 import config
-from multi_indexer import MultiSourceIndexer
+from multi_indexer_02 import GoogleDriveIndexer
 
 # Import our auth/drive routers
 from auth import routes as auth_routes
@@ -41,50 +41,88 @@ app.include_router(auth_routes.router)
 #app.include_router(drive_routes.router)
 
 # ===== GLOBAL INDEXER =====
-indexer = MultiSourceIndexer()
+indexer = GoogleDriveIndexer()
 
 # ===== API ROUTES =====
 
-@app.post("/build/file")
-async def build_from_file(file: UploadFile = File(...), collection_name: str = Form("all_files")):
-    temp_path = Path(tempfile.gettempdir()) / file.filename
-    with open(temp_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    try:
-        indexer.build_index_from_file(str(temp_path), collection_name=collection_name)
-        return {"status": "success", "message": f"Index built from file {file.filename}"}
-    finally:
-        temp_path.unlink(missing_ok=True)
+# @app.post("/build/file")
+# async def build_from_file(file: UploadFile = File(...), collection_name: str = Form("all_files")):
+#     temp_path = Path(tempfile.gettempdir()) / file.filename
+#     with open(temp_path, "wb") as f:
+#         shutil.copyfileobj(file.file, f)
+#     try:
+#         indexer.build_index_from_file(str(temp_path), collection_name=collection_name)
+#         return {"status": "success", "message": f"Index built from file {file.filename}"}
+#     finally:
+#         temp_path.unlink(missing_ok=True)
 
 
-@app.post("/build/folder")
-async def build_from_folder(folder_path: str = Form(...), collection_name: str = Form("all_files")):
-    try:
-        indexer.build_index_from_folder(folder_path, collection_name=collection_name)
-        return {"status": "success", "message": f"Index built from folder {folder_path}"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# @app.post("/build/folder")
+# async def build_from_folder(folder_path: str = Form(...), collection_name: str = Form("all_files")):
+#     try:
+#         indexer.build_index_from_folder(folder_path, collection_name=collection_name)
+#         return {"status": "success", "message": f"Index built from folder {folder_path}"}
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/build/drive")
-async def build_from_drive(drive_link: str = Form(...), collection_name: str = Form("all_files")):
+async def build_from_drive(
+    drive_links: Union[str, List[str]] = Form(...), 
+    collection_name: str = Form("drive_docs")
+):
     try:
-        indexer.build_index_from_drive(drive_link, collection_name=collection_name)
-        return {"status": "success", "message": f"Index built from Drive folder {drive_link}"}
+        # Normalize input → always a list
+        if isinstance(drive_links, str):
+            drive_links = [drive_links]
+
+        all_docs_count = 0
+        for link in drive_links:
+            summary = indexer.build_index_from_drive(link, collection_name=collection_name)
+            all_docs_count += summary['processed'] if summary else 0
+
+        return {
+            "status": "success",
+            "message": f"✅ Indexed {len(drive_links)} Drive link(s)",
+            "collection": collection_name,
+            "num_documents": all_docs_count
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/build/zip")
-async def build_from_zip(zip_file: UploadFile = File(...), collection_name: str = Form("zip_files")):
-    temp_path = Path(tempfile.gettempdir()) / zip_file.filename
-    with open(temp_path, "wb") as f:
-        shutil.copyfileobj(zip_file.file, f)
+
+# @app.post("/build/zip")
+# async def build_from_zip(zip_file: UploadFile = File(...), collection_name: str = Form("zip_files")):
+#     temp_path = Path(tempfile.gettempdir()) / zip_file.filename
+#     with open(temp_path, "wb") as f:
+#         shutil.copyfileobj(zip_file.file, f)
+#     try:
+#         indexer.build_index_from_zip(str(temp_path), collection_name=collection_name)
+#         return {"status": "success", "message": f"Index built from ZIP {zip_file.filename}"}
+#     finally:
+#         temp_path.unlink(missing_ok=True)
+
+
+@app.post("/preview/drive")
+async def preview_drive_files(
+    drive_links: Union[str, List[str]] = Form(...)
+):
+    """
+    Preview contents of one or multiple Google Drive folders/files 
+    without building the index.
+    """
     try:
-        indexer.build_index_from_zip(str(temp_path), collection_name=collection_name)
-        return {"status": "success", "message": f"Index built from ZIP {zip_file.filename}"}
-    finally:
-        temp_path.unlink(missing_ok=True)
+        files = indexer.get_drive_folder_files(drive_links)
+        return {
+            "status": "success",
+            "count": len(files),
+            "files": files
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 
 
 @app.get("/query")
