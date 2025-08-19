@@ -12,7 +12,6 @@ OPENAI_MODEL = config.OPENAI_MODELS["chat"]
 openai.api_key = config.OPENAI_API_KEY
 api_call_count = 0
 
-print("This is parser.py ==================> ",openai.api_key)  # Debug: print API key to ensure it's loaded correctly
 
 # -----------------------------
 # ENHANCED FORMULA & IMAGE EXTRACTION
